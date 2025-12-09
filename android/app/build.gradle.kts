@@ -1,13 +1,7 @@
-// android/app/build.gradle
-
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    // *** TAMBAHAN: Plugin Google Services untuk Firebase ***
     id("com.google.gms.google-services")
-    // ****************************************************
-
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
@@ -44,17 +38,15 @@ flutter {
     source = "../.."
 }
 
-// *** DEPENDENSI FIREBASE ***
 dependencies {
-    // Implementasi Kotlin standard library
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.0")
 
-    // Firebase Bill of Materials (BOM) - untuk manajemen versi yang kompatibel
+    // Firebase BOM
     implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
 
-    // Dependencies produk Firebase yang dibutuhkan:
-    implementation("com.google.firebase:firebase-analytics")
-    implementation("com.google.firebase:firebase-auth") // Untuk Login/Daftar
-    implementation("com.google.firebase:firebase-firestore") // Untuk Database
+    // Firestore
+    implementation("com.google.firebase:firebase-firestore")
+
+    // Google Auth (versi yang ada)
+    implementation("com.google.android.gms:play-services-auth:20.7.0")
 }
-// *************************

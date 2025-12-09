@@ -3,18 +3,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/product_model.dart';
+import '../models/cart_item_model.dart';
 import '../providers/product_provider.dart';
-import '../providers/cart_provider.dart'; // <<< PENTING: Impor CartProvider
-import 'cart_screen.dart'; // <<< PENTING: Impor CartScreen untuk Navigasi
+import '../providers/cart_provider.dart';
+import 'cart_screen.dart';
 
 class ProductDetailScreen extends StatelessWidget {
   final String productId;
 
   const ProductDetailScreen({Key? key, required this.productId}) : super(key: key);
 
-  // Widget untuk membuat ikon keranjang dengan badge counter
+  // Widget ikon keranjang dengan badge counter
   Widget _buildCartIcon(BuildContext context) {
-    // Menggunakan Consumer agar icon bisa otomatis update
     return Consumer<CartProvider>(
       builder: (_, cart, ch) => Stack(
         alignment: Alignment.center,
@@ -22,15 +22,11 @@ class ProductDetailScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.shopping_cart, color: Colors.white),
             onPressed: () {
-              // Navigasi ke CartScreen
               Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const CartScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => const CartScreen()),
               );
             },
           ),
-          // Badge Counter (Hanya Tampil jika ada item)
           if (cart.itemCount > 0)
             Positioned(
               right: 0,
@@ -41,10 +37,7 @@ class ProductDetailScreen extends StatelessWidget {
                   color: Colors.red,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                constraints: const BoxConstraints(
-                  minWidth: 18,
-                  minHeight: 18,
-                ),
+                constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
                 child: Text(
                   cart.itemCount.toString(),
                   style: const TextStyle(
@@ -63,11 +56,9 @@ class ProductDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Cari produk berdasarkan ID dari provider
     final productProvider = Provider.of<ProductProvider>(context);
     final ProductModel? product = productProvider.getProductById(productId);
 
-    // Ambil instance CartProvider (gunakan listen: false karena hanya untuk memanggil metode)
     final cartProvider = Provider.of<CartProvider>(context, listen: false);
 
     if (product == null) {
@@ -96,22 +87,21 @@ class ProductDetailScreen extends StatelessWidget {
       );
     }
 
-    // --- Tampilan Detail Produk ---
     return Scaffold(
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 300.0,
-            floating: false,
+            expandedHeight: 300,
             pinned: true,
             actions: [
-              _buildCartIcon(context), // <<< TAMBAHKAN IKON KERANJANG DI SINI
+              _buildCartIcon(context),
               const SizedBox(width: 8),
             ],
             flexibleSpace: FlexibleSpaceBar(
-              title: Text(product.name,
+              title: Text(
+                product.name,
                 style: const TextStyle(
-                  fontSize: 16.0,
+                  fontSize: 16,
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                   shadows: [Shadow(blurRadius: 5, color: Colors.black)],
@@ -135,14 +125,13 @@ class ProductDetailScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Harga dan Kategori
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
                             product.formattedPrice,
                             style: TextStyle(
-                              fontSize: 32.0,
+                              fontSize: 32,
                               fontWeight: FontWeight.w900,
                               color: Colors.red[700],
                             ),
@@ -161,8 +150,6 @@ class ProductDetailScreen extends StatelessWidget {
                         ],
                       ),
                       const Divider(height: 30),
-
-                      // Rating & Stok
                       Row(
                         children: [
                           const Icon(Icons.star, color: Colors.amber, size: 24),
@@ -179,17 +166,15 @@ class ProductDetailScreen extends StatelessWidget {
                           const Spacer(),
                           Text(
                             'Stok: ${product.stock}',
-                            style: TextStyle(fontSize: 16, color: product.stock > 10 ? Colors.green : Colors.orange),
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: product.stock > 10 ? Colors.green : Colors.orange,
+                            ),
                           ),
                         ],
                       ),
                       const Divider(height: 30),
-
-                      // Deskripsi
-                      const Text(
-                        'Deskripsi Produk',
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                      ),
+                      const Text('Deskripsi Produk', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 10),
                       Text(
                         product.description,
@@ -205,46 +190,51 @@ class ProductDetailScreen extends StatelessWidget {
           ),
         ],
       ),
-      // Tombol mengambang di bawah
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(16.0),
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, -5),
-            ),
+            BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -5)),
           ],
         ),
         child: Row(
           children: [
-            // Tombol Chat
             IconButton(
               icon: const Icon(Icons.chat_bubble_outline, color: Colors.teal, size: 30),
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Chat dengan Penjual')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Chat dengan Penjual')),
+                );
               },
             ),
             const SizedBox(width: 16),
-            // Tombol Tambah Keranjang
             Expanded(
               child: ElevatedButton.icon(
                 icon: const Icon(Icons.add_shopping_cart, color: Colors.white),
                 label: const Text('Tambah ke Keranjang', style: TextStyle(color: Colors.white, fontSize: 16)),
-                onPressed: product.stock > 0 ? () {
-                  // !!! PERBAIKAN PENTING: Memanggil CartProvider.addItem()
-                  cartProvider.addItem(product);
-
-                  // Tampilkan konfirmasi
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('${product.name} berhasil ditambahkan ke keranjang!'),
-                        duration: const Duration(seconds: 1),
-                      )
+                onPressed: product.stock > 0
+                    ? () {
+                  final cartItem = CartItemModel(
+                    id: DateTime.now().toString(),
+                    productId: product.id ?? DateTime.now().toString(), // fallback jika null
+                    name: product.name,
+                    price: product.price,
+                    costPrice: product.costPrice,
+                    quantity: 1,
+                    imageUrl: product.imageUrl,
                   );
-                } : null, // Disable jika stok 0
+                  cartProvider.addItem(cartItem);
+
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${product.name} berhasil ditambahkan ke keranjang!'),
+                      duration: const Duration(seconds: 1),
+                    ),
+                  );
+                }
+                    : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: product.stock > 0 ? Colors.orange : Colors.grey,
                   padding: const EdgeInsets.symmetric(vertical: 15),

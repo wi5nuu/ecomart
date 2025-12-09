@@ -10,7 +10,7 @@ class FirestoreService {
   Future<void> saveUser(UserModel user) async {
     try {
       if (user.id == null) {
-        throw Exception('ID user belum diisi. Pastikan UID Firebase Auth sudah tersedia.');
+        throw Exception('ID user belum diisi. Pastikan ID user sudah dibuat.');
       }
       await _firestore.collection('users').doc(user.id!).set(user.toMap());
     } catch (e) {

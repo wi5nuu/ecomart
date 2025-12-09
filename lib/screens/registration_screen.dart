@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/custom_textfield.dart';
-import 'package:ecomart/models/user_model.dart'; // Pastikan path ke UserModel benar
+import 'package:ecomart/models/user_model.dart';
+import '../wrappers/auth_wrapper.dart';
+
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({Key? key}) : super(key: key);
@@ -14,7 +16,6 @@ class RegistrationScreen extends StatefulWidget {
 class _RegistrationScreenState extends State<RegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // Controller untuk text fields
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -22,76 +23,55 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
 
-  // State untuk form
   String _selectedGender = 'Laki-laki';
   bool _agreeToTerms = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
-  // Validator functions
+  // =======================
+  // Validators
+  // =======================
   String? _validateName(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Nama lengkap harus diisi';
-    }
-    if (value.length < 3) {
-      return 'Nama minimal 3 karakter';
-    }
+    if (value == null || value.isEmpty) return 'Nama lengkap harus diisi';
+    if (value.length < 3) return 'Nama minimal 3 karakter';
     return null;
   }
 
   String? _validateEmail(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Email harus diisi';
-    }
+    if (value == null || value.isEmpty) return 'Email harus diisi';
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-    if (!emailRegex.hasMatch(value)) {
-      return 'Format email tidak valid';
-    }
+    if (!emailRegex.hasMatch(value)) return 'Format email tidak valid';
     return null;
   }
 
   String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Password harus diisi';
-    }
-    if (value.length < 6) {
-      return 'Password minimal 6 karakter';
-    }
+    if (value == null || value.isEmpty) return 'Password harus diisi';
+    if (value.length < 6) return 'Password minimal 6 karakter';
     return null;
   }
 
   String? _validateConfirmPassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Konfirmasi password harus diisi';
-    }
-    if (value != _passwordController.text) {
-      return 'Password tidak cocok';
-    }
+    if (value == null || value.isEmpty) return 'Konfirmasi password harus diisi';
+    if (value != _passwordController.text) return 'Password tidak cocok';
     return null;
   }
 
   String? _validatePhone(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Nomor telepon harus diisi';
-    }
-    // Asumsi format nomor telepon yang lebih fleksibel
+    if (value == null || value.isEmpty) return 'Nomor telepon harus diisi';
     final phoneRegex = RegExp(r'^[0-9]{10,14}$');
-    if (!phoneRegex.hasMatch(value)) {
-      return 'Nomor telepon minimal 10 digit dan maksimal 14 digit';
-    }
+    if (!phoneRegex.hasMatch(value)) return 'Nomor telepon 10-14 digit';
     return null;
   }
 
   String? _validateAddress(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Alamat harus diisi';
-    }
-    if (value.length < 10) {
-      return 'Alamat minimal 10 karakter';
-    }
+    if (value == null || value.isEmpty) return 'Alamat harus diisi';
+    if (value.length < 10) return 'Alamat minimal 10 karakter';
     return null;
   }
 
+  // =======================
+  // Submit form
+  // =======================
   Future<void> _submitForm() async {
     if (!_agreeToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -100,35 +80,34 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           backgroundColor: Colors.orange,
         ),
       );
-      return; // Berhenti jika belum menyetujui
+      return;
     }
 
     if (_formKey.currentState!.validate()) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      // Membuat UserModel (tanpa ID/isAdmin, akan diisi di AuthProvider)
       final userModelData = UserModel(
-        name: _nameController.text,
-        email: _emailController.text,
-        phone: _phoneController.text,
-        address: _addressController.text,
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        phone: _phoneController.text.trim(),
+        address: _addressController.text.trim(),
         gender: _selectedGender,
-        // PERBAIKAN: agreeToTerms harus disertakan karena merupakan required parameter
         agreeToTerms: _agreeToTerms,
-        // ID dan isAdmin akan diisi/default di constructor atau AuthProvider
+        password: _passwordController.text.trim(),
       );
 
       try {
         final success = await authProvider.register(
-          userModelData, // Mengirim data user model lengkap
-          _emailController.text, // Email untuk Firebase Auth
-          _passwordController.text, // Password untuk Firebase Auth
+          userModelData,
+          _passwordController.text.trim(),
         );
 
         if (success) {
-          // Navigasi ke /wrapper untuk menentukan layar beranda yang tepat
-          // dan menghapus semua rute sebelumnya
-          Navigator.of(context).pushNamedAndRemoveUntil('/wrapper', (route) => false);
+          // Navigasi langsung ke AuthWrapper
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const AuthWrapper()),
+                (route) => false,
+          );
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -137,7 +116,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             ),
           );
         } else {
-          // Jika gagal, tampilkan pesan error dari provider
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(authProvider.errorMessage ?? 'Registrasi gagal. Coba lagi.'),
@@ -155,7 +133,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       }
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -175,7 +152,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   key: _formKey,
                   child: ListView(
                     children: [
-                      // Nama Lengkap
                       CustomTextField(
                         controller: _nameController,
                         label: 'Nama Lengkap',
@@ -184,8 +160,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         prefixIcon: Icons.person,
                       ),
                       const SizedBox(height: 16),
-
-                      // Email
                       CustomTextField(
                         controller: _emailController,
                         label: 'Email',
@@ -195,8 +169,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         prefixIcon: Icons.email,
                       ),
                       const SizedBox(height: 16),
-
-                      // Password
                       CustomTextField(
                         controller: _passwordController,
                         label: 'Password',
@@ -216,8 +188,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-
-                      // Konfirmasi Password
                       CustomTextField(
                         controller: _confirmPasswordController,
                         label: 'Konfirmasi Password',
@@ -237,8 +207,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-
-                      // Nomor Telepon
                       CustomTextField(
                         controller: _phoneController,
                         label: 'Nomor Telepon',
@@ -248,8 +216,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         prefixIcon: Icons.phone,
                       ),
                       const SizedBox(height: 16),
-
-                      // Alamat
                       CustomTextField(
                         controller: _addressController,
                         label: 'Alamat',
@@ -259,23 +225,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         prefixIcon: Icons.home,
                       ),
                       const SizedBox(height: 16),
-
-                      // Jenis Kelamin (Dropdown)
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Jenis Kelamin',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
+                          Text('Jenis Kelamin', style: Theme.of(context).textTheme.titleMedium),
                           const SizedBox(height: 8),
                           DropdownButtonFormField<String>(
                             value: _selectedGender,
                             items: ['Laki-laki', 'Perempuan']
-                                .map((gender) => DropdownMenuItem(
-                              value: gender,
-                              child: Text(gender),
-                            ))
+                                .map((gender) => DropdownMenuItem(value: gender, child: Text(gender)))
                                 .toList(),
                             onChanged: (value) {
                               setState(() {
@@ -283,20 +241,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                               });
                             },
                             decoration: InputDecoration(
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 16,
-                              ),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
-
-                      // Syarat dan Ketentuan (Checkbox)
                       Row(
                         children: [
                           Checkbox(
@@ -323,17 +274,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         ],
                       ),
                       const SizedBox(height: 24),
-
-                      // Submit Button
                       ElevatedButton(
                         onPressed: authProvider.isLoading ? null : _submitForm,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue.shade700,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                         child: authProvider.isLoading
                             ? const SizedBox(
@@ -346,24 +293,16 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                         )
                             : const Text(
                           'Daftar',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                       ),
                       const SizedBox(height: 16),
-
-                      // Login Link
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           const Text('Sudah punya akun?'),
                           TextButton(
-                            onPressed: () {
-                              // Navigasi ke layar login
-                              Navigator.pushNamed(context, '/login');
-                            },
+                            onPressed: () => Navigator.pushNamed(context, '/login'),
                             child: const Text('Login di sini'),
                           ),
                         ],
@@ -372,14 +311,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   ),
                 ),
               ),
-              // Loading overlay saat memproses
               if (authProvider.isLoading)
                 Container(
                   color: Colors.black54,
                   child: const Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
+                    child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
                   ),
                 ),
             ],

@@ -14,11 +14,11 @@ dependencies:
 
   cupertino_icons: ^1.0.2
 
-  # Firebase (stabil untuk Flutter 3.x)
+  # Firebase (hanya core dan Firestore)
   firebase_core: ^2.32.0
   cloud_firestore: ^4.17.5
-  firebase_auth: ^4.16.0
 
+  # State management dan localization
   provider: ^6.1.1
   intl: ^0.18.1
 
@@ -27,19 +27,19 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^3.0.1
 
-  # 2. Package untuk membuat ikon aplikasi kustom
-  flutter_launcher_icons: "^0.13.1" # BARU
+  # Package untuk membuat ikon aplikasi kustom
+  flutter_launcher_icons: "^0.13.1"
 
 flutter:
   uses-material-design: true
 
-  # 1. Pendaftaran folder aset untuk gambar
+  # Folder aset untuk gambar
   assets:
-    - assets/images/ # BARU: Daftarkan folder images
+    - assets/images/
 
-# 3. Konfigurasi Launcher Icons
+# Konfigurasi Launcher Icons
 flutter_launcher_icons:
-  android: "launcher_icon"
+  android: true
   ios: true
   image_path: "assets/images/ecomart.png"
   min_sdk_android: 21

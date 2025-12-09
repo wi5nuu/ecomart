@@ -1,5 +1,8 @@
+// lib/screens/checkout_screen.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/cart_item_model.dart';
 import '../models/checkout_model.dart';
 import '../providers/cart_provider.dart';
 import 'products_screen.dart';
@@ -15,19 +18,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   late CheckoutModel _checkoutData;
   final TextEditingController _voucherController = TextEditingController();
 
-  final List<String> _jabodetabekCities = [
-    'Jakarta',
-    'Bogor',
-    'Depok',
-    'Tangerang',
-    'Bekasi',
-  ];
-
+  final List<String> _jabodetabekCities = ['Jakarta', 'Bogor', 'Depok', 'Tangerang', 'Bekasi'];
   final List<String> _allCities = [
     'Jakarta', 'Bogor', 'Depok', 'Tangerang', 'Bekasi',
     'Bandung', 'Surabaya', 'Medan', 'Yogyakarta'
   ];
-
   final List<String> _paymentMethods = [
     'Transfer Bank BNI',
     'Transfer Bank Mandiri',
@@ -36,13 +31,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     'Bayar di Tempat (COD)',
   ];
 
+  bool _isProcessing = false;
+
   @override
   void initState() {
     super.initState();
     final cartProvider = Provider.of<CartProvider>(context, listen: false);
-
     _checkoutData = CheckoutModel(subtotal: cartProvider.totalAmount);
-
     _calculateShippingCost();
   }
 
@@ -52,7 +47,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     super.dispose();
   }
 
-  /// Hitung ongkos kirim berdasarkan kota
   void _calculateShippingCost() {
     setState(() {
       final city = _checkoutData.city;
@@ -60,7 +54,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
   }
 
-  /// Terapkan voucher diskon
   void _applyVoucher(String code) {
     setState(() {
       _checkoutData.voucherCode = code.toUpperCase();
@@ -84,8 +77,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  /// Proses pembayaran
-  void _processPayment() {
+  Future<void> _processPayment() async {
     if (_checkoutData.selectedAddress.isEmpty || _checkoutData.selectedAddress == 'Pilih Alamat Pengiriman') {
       _showSnack('Mohon pilih alamat pengiriman terlebih dahulu.', Colors.red);
       return;
@@ -97,21 +89,57 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
 
     final cartProvider = Provider.of<CartProvider>(context, listen: false);
-    cartProvider.clearCart();
 
-    _showSnack(
-      'Pembayaran sebesar Rp ${_checkoutData.totalFinal.toStringAsFixed(0)} sukses! Pesanan sedang diproses.',
-      Colors.green,
-    );
+    if (cartProvider.items.isEmpty) {
+      _showSnack('Keranjang kosong!', Colors.red);
+      return;
+    }
 
-    // Navigasi kembali ke layar produk, hapus semua layar sebelumnya
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const ProductsScreen()),
-          (route) => false,
-    );
+    setState(() => _isProcessing = true);
+
+    try {
+      // Buat ID transaksi unik
+      final transactionRef = FirebaseFirestore.instance.collection('transactions').doc();
+      final transactionId = transactionRef.id;
+
+      // Mapping CartItemModel ke Map untuk Firestore
+      final cartItems = cartProvider.items.map((item) => item.toMapForTransaction()).toList();
+
+      // Simpan transaksi ke Firestore
+      await transactionRef.set({
+        'userId': 'guest', // karena tidak pakai auth, bisa diganti dengan ID unik user jika ada
+        'items': cartItems,
+        'subtotal': _checkoutData.subtotal,
+        'totalAmount': _checkoutData.totalFinal,
+        'totalCostPrice': cartProvider.totalCostPrice,
+        'shippingCost': _checkoutData.shippingCost,
+        'discountAmount': _checkoutData.discountAmount,
+        'paymentMethod': _checkoutData.paymentMethod,
+        'address': _checkoutData.selectedAddress,
+        'city': _checkoutData.city,
+        'status': 'pending',
+        'transactionDate': Timestamp.now(),
+      });
+
+      // Clear keranjang
+      cartProvider.clearCart();
+
+      _showSnack(
+        'Pembayaran Rp ${_checkoutData.totalFinal.toStringAsFixed(0)} berhasil! Transaksi sedang diproses.',
+        Colors.green,
+      );
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const ProductsScreen()),
+            (route) => false,
+      );
+    } catch (e) {
+      _showSnack('Terjadi kesalahan saat memproses transaksi: $e', Colors.red);
+    } finally {
+      setState(() => _isProcessing = false);
+    }
   }
 
-  /// Widget Pilih Alamat
   Widget _buildAddressSection() {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -169,7 +197,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  /// Widget Voucher
   Widget _buildVoucherSection() {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -215,7 +242,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  /// Widget Metode Pembayaran
   Widget _buildPaymentSection() {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -264,7 +290,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  /// Ringkasan Pembayaran
   Widget _buildSummarySection() {
     return Card(
       margin: const EdgeInsets.only(bottom: 100),
@@ -341,6 +366,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             _buildVoucherSection(),
             _buildPaymentSection(),
             _buildSummarySection(),
+            if (_isProcessing)
+              const Padding(
+                padding: EdgeInsets.all(8.0),
+                child: Center(child: CircularProgressIndicator()),
+              ),
           ],
         ),
       ),
@@ -359,12 +389,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 'Bayar Sekarang (Rp ${_checkoutData.totalFinal.toStringAsFixed(0)})',
                 style: const TextStyle(color: Colors.white, fontSize: 18),
               ),
-              onPressed: cartProvider.itemCount > 0 &&
-                  _checkoutData.totalFinal > 0.0 &&
-                  _checkoutData.selectedAddress != 'Pilih Alamat Pengiriman' &&
-                  _checkoutData.paymentMethod != 'Pilih Metode Pembayaran'
-                  ? _processPayment
-                  : null,
+              onPressed: _isProcessing || cartProvider.items.isEmpty ? null : _processPayment,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red.shade700,
                 padding: const EdgeInsets.symmetric(vertical: 15),

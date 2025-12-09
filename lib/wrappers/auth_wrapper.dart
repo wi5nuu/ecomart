@@ -9,8 +9,15 @@ import '../screens/home_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/splash_screen.dart';
 
-class AuthWrapper extends StatelessWidget {
+class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
+
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  bool _cartListenerInitialized = false;
 
   @override
   Widget build(BuildContext context) {
@@ -22,18 +29,23 @@ class AuthWrapper extends StatelessWidget {
       return const SplashScreen();
     }
 
-    // 2. Jika belum login
+    // 2. BELUM LOGIN → langsung ke LoginScreen
     if (!auth.isAuthenticated || auth.currentUser == null) {
+      // Hentikan listener cart lama
+      cartProvider.clearCart();
+      _cartListenerInitialized = false;
       return const LoginScreen();
     }
 
-    // 3. User berhasil login → AKTIFKAN LISTENER TANPA MERUSAK build()
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      cartProvider.setupCartListener();
-    });
+    // 3. SUDAH LOGIN → setup cart listener sekali saja
+    if (!_cartListenerInitialized) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _cartListenerInitialized = true;
+      });
+    }
 
-    // 4. User admin
-    if (auth.currentUser!.isAdmin) {
+    // 4. Admin
+    if (auth.isAdmin) {
       return const AdminAnalyticsScreen();
     }
 

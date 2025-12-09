@@ -19,9 +19,7 @@ class HomeScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async { // Jadikan async
-              await authProvider.logout();
-              // Setelah logout, AuthWrapper akan otomatis mengarahkan ke LoginScreen.
-              // Kita hapus semua rute sebelumnya, lalu kembali ke rute root ('/')
+              authProvider.logout();
               Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
             },
           ),

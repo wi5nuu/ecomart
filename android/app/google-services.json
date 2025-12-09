@@ -12,7 +12,16 @@
           "package_name": "com.ecomart.ecomart"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1059347487376-co2pd1ug9qb8ct6ickg8m3cs8oi429l4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ecomart.ecomart",
+            "certificate_hash": "7a445b6b8ecb3c06c137c84823f81c296ca135a2"
+          }
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyACJCtdoz_WxQUGFYUFMZZta3U3V9CbNK0"

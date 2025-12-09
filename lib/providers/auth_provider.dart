@@ -1,158 +1,174 @@
 import 'package:flutter/foundation.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
-import '../services/firestore_service.dart';
+import 'package:crypto/crypto.dart';
+import 'dart:convert'; // for utf8.encode
 
 class AuthProvider with ChangeNotifier {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirestoreService _firestoreService = FirestoreService();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   UserModel? _currentUser;
   bool _isLoading = false;
   String? _errorMessage;
   bool _isAuthReady = false;
 
+  // =========================
+  // Getter
+  // =========================
   UserModel? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _currentUser != null;
-  bool get isAdmin => _currentUser?.isAdmin ?? false;
+  bool get isAdmin => _currentUser?.role == 'admin';
   bool get isAuthReady => _isAuthReady;
 
-  AuthProvider() {
-    _auth.authStateChanges().listen(_onAuthStateChanged);
+  // =========================
+  // Private: hash password
+  // =========================
+  String _hashPassword(String password) {
+    return sha256.convert(utf8.encode(password)).toString();
   }
 
-  Future<void> _onAuthStateChanged(User? firebaseUser) async {
-    if (firebaseUser == null) {
-      _currentUser = null;
-    } else {
-      try {
-        final userModel = await _firestoreService.getUser(firebaseUser.uid);
-        _currentUser = userModel;
-      } catch (e) {
-        if (kDebugMode) print('Error mengambil user Firestore: $e');
-        _currentUser = null;
-      }
-    }
+  // =========================
+  // Set auth ready
+  // =========================
+  void setAuthReady() {
     _isAuthReady = true;
     notifyListeners();
   }
 
+  // =========================
   // Register user
-  Future<bool> register(UserModel newUserModel, String email, String password) async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
+  // =========================
+  Future<bool> register(UserModel newUser, String password) async {
+    _setLoading(true);
+    _clearError();
 
     try {
-      // 1️⃣ Buat user di Firebase Auth
-      final userCredential = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      final userRef = _firestore.collection('users');
 
-      final firebaseUser = userCredential.user;
-      if (firebaseUser == null) {
-        _errorMessage = 'Gagal membuat akun Firebase.';
-        _isLoading = false;
-        notifyListeners();
+      // cek email sudah ada atau belum
+      final query = await userRef.where('email', isEqualTo: newUser.email).get();
+      if (query.docs.isNotEmpty) {
+        _setError('Email sudah digunakan.');
         return false;
       }
 
-      // 2️⃣ Buat user di Firestore collection 'users' dengan uid sebagai ID
-      final userToSave = newUserModel.copyWith(id: firebaseUser.uid);
-      await _firestoreService.saveUser(userToSave);
+      // hash password
+      final hashedPassword = _hashPassword(password);
 
-      // 3️⃣ Update current user
-      _currentUser = userToSave;
-      _isAuthReady = true;
-      _isLoading = false;
-      notifyListeners();
-      return true;
-
-    } on FirebaseAuthException catch (e) {
-      if (e.code == 'weak-password') {
-        _errorMessage = 'Password terlalu lemah.';
-      } else if (e.code == 'email-already-in-use') {
-        _errorMessage = 'Email sudah digunakan.';
-      } else {
-        _errorMessage = 'Registrasi gagal: ${e.message}';
-      }
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    } catch (e) {
-      _errorMessage = 'Error tak terduga: $e';
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    }
-  }
-
-  // Login user
-  Future<bool> login(String email, String password) async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      final userCredential = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
+      // buat dokumen baru
+      final docRef = userRef.doc();
+      final userToSave = newUser.copyWith(
+        id: docRef.id,
+        password: hashedPassword,
       );
 
-      final firebaseUser = userCredential.user;
-      if (firebaseUser != null) {
-        final userModel = await _firestoreService.getUser(firebaseUser.uid);
-        if (userModel == null) {
-          _errorMessage = "Data user tidak ditemukan di Firestore.";
-          _isLoading = false;
-          notifyListeners();
-          return false;
-        }
-        _currentUser = userModel;
-      }
+      await docRef.set(userToSave.toMap());
+      _currentUser = userToSave;
 
-      _isAuthReady = true;
-      _isLoading = false;
-      notifyListeners();
       return true;
-
-    } on FirebaseAuthException catch (e) {
-      if (e.code == 'user-not-found' || e.code == 'wrong-password') {
-        _errorMessage = 'Email atau password salah.';
-      } else {
-        _errorMessage = 'Login gagal: ${e.message}';
-      }
-      _isLoading = false;
-      notifyListeners();
-      return false;
     } catch (e) {
-      _errorMessage = 'Error tak terduga: $e';
-      _isLoading = false;
-      notifyListeners();
+      _setError('Error registrasi: $e');
       return false;
-    }
-  }
-
-  // Logout
-  Future<void> logout() async {
-    _isLoading = true;
-    notifyListeners();
-    try {
-      await _auth.signOut();
-    } catch (e) {
-      if (kDebugMode) print('Error saat logout: $e');
     } finally {
-      _currentUser = null;
-      _isLoading = false;
-      notifyListeners();
+      _setLoading(false);
     }
   }
 
-  void clearError() {
-    _errorMessage = null;
+  // =========================
+  // Login user
+  // =========================
+  Future<bool> login(String email, String password) async {
+    _setLoading(true);
+    _clearError();
+
+    try {
+      final hashedPassword = _hashPassword(password);
+      final userRef = _firestore.collection('users');
+      final query = await userRef
+          .where('email', isEqualTo: email)
+          .where('password', isEqualTo: hashedPassword)
+          .get();
+
+      if (query.docs.isEmpty) {
+        _setError('Email atau password salah.');
+        return false;
+      }
+
+      final doc = query.docs.first;
+      final Map<String, dynamic> userData = doc.data() as Map<String, dynamic>;
+      _currentUser = UserModel.fromMap(doc.id, userData);
+
+      return true;
+    } catch (e) {
+      _setError('Error login: $e');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // =========================
+  // Logout user
+  // =========================
+  void logout() {
+    _currentUser = null;
     notifyListeners();
   }
+
+  // =========================
+  // Clear error
+  // =========================
+  void clearError() {
+    _clearError();
+    notifyListeners();
+  }
+
+  // =========================
+  // Private helpers
+  // =========================
+  void _setLoading(bool value) {
+    _isLoading = value;
+    notifyListeners();
+  }
+
+  void _setError(String message) {
+    _errorMessage = message;
+    notifyListeners();
+  }
+
+  void _clearError() {
+    _errorMessage = null;
+  }
+
+  // =========================
+  // Update currentUser data (opsional)
+  // =========================
+  Future<void> refreshUserData() async {
+    if (_currentUser == null) return;
+
+    try {
+      final doc = await _firestore.collection('users').doc(_currentUser!.id).get();
+      if (doc.exists) {
+        _currentUser = UserModel.fromMap(doc.id, doc.data()!);
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Gagal refresh user data: $e');
+    }
+  }
+
+
+  // =========================
+// Cek session login otomatis
+// =========================
+  Future<void> tryAutoLogin() async {
+    // Simulasi cek session / token yang tersimpan di device
+    // Karena kita tidak pakai SharedPreferences, kita hanya set auth ready
+    // jika sudah ada currentUser di memory (misal setelah login sebelumnya)
+    await Future.delayed(const Duration(milliseconds: 500)); // optional delay
+    setAuthReady();
+  }
+
 }
